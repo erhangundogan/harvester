@@ -1,5 +1,8 @@
 !proxy/readme.md
 !address/readme.md
 !log/readme.md
+log/*.log
+address/*
+proxy/*
 node_modules/*
 .idea/*

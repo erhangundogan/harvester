@@ -10,6 +10,6 @@
   },
   "dependencies": {
     "request": ">= 2.16.6",
-    "jstools": ">= 0.0.7"
+    "jstools": ">= 0.0.9"
   }
 }

@@ -2,7 +2,7 @@
 
 ### Asynchronous Proxy/Address test and automation tool
 
- ### How to Install
+### How to Install
 
 ```bash
 npm install -d proxy_harvester
