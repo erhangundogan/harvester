@@ -10,6 +10,11 @@ npm install -d proxy_harvester
 
 ### How to use
 
+* put your proxy list file into proxy directory
+* put your address list file into address directory
+* specify items in settings.js file for your needs
+* run application below
+
 ```bash
 node app.js
 ```
