@@ -1,6 +1,6 @@
 {
   "name": "proxy_harvester",
-  "version": "0.1.0",
+  "version": "0.2.1",
   "description": "Harvester, Asynchronous Proxy/Address test and automation tool",
   "keywords": ["proxy", "async", "asynchronous", "node", "nodejs"],
   "author": "Erhan Gundogan <erhan@trposta.net>",
