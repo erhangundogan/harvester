@@ -10,7 +10,8 @@
       proxy_counter = 0,
       address_counter = 0,
       proxy_first = false,
-      log_file = false,
+      log_to_file = false,
+      log_filename = "",
       proxy_from_file = true,
       address_from_file = false,
       request_method = "HEAD",
@@ -25,8 +26,25 @@
         "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.31 (KHTML, like Gecko) Chrome/26.0.1410.40 Safari/537.31"
       };
 
-  if (read_from_file) {
-    var data = fs.readFileSync(path.join(__dirname, "list", file_name));
+  function write_log(data) {
+    if (log_to_file) {
+      fs.appendFile(path.join(__dirname, "log", log_filename), data, function (err, result) {
+        if (err) throw err.stack||err;
+      });
+    }
+  }
+
+  if (proxy_from_file) {
+    var proxy_data = fs.readFileSync(path.join(__dirname, "proxy", proxy_filename));
+  }
+
+  if (address_from_file) {
+    var address_data = fs.readFileSync(path.join(__dirname, "address", address_filename));
+  }
+
+  if (log_to_file) {
+    var dt = new Date();
+    log_filename = dt.getFullYear()+""+(dt.getMonth()+1)+""+ dt.getDate()+"-"+dt.getTime()+".log";
   }
   
   var interval = setInterval(function() {
@@ -63,11 +81,9 @@
       }
     }
 
-    var logText = "Address: " + address_list[address_counter] + "\tProxy: " + proxy_list[proxy_counter];
-    console.log(logText);
-    if (log_file) {
-
-    }
+    var log_data = "Address: " + address_list[address_counter] + "\tProxy: " + proxy_list[proxy_counter];
+    console.log(log_data);
+    write_log(log_data);
 
   }, timer);
 //})();
