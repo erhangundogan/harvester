@@ -14,6 +14,7 @@ npm install -d proxy_harvester
 * put your address list file into address directory
 * specify items in settings.js file for your needs
 * run application below
+* enjoy the colorful results
 
 ```bash
 node app.js

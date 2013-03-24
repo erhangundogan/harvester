@@ -5,6 +5,7 @@
       fs = require("fs"),
       path = require("path"),
       jstools = require("jstools"),
+      colors = require("colors"),
       settings = require("./settings"),
       Search = require("./schema/search").Search,
       proxy_counter = 0,
@@ -29,8 +30,12 @@
         for (var index in raw_proxy_array) {
           if (!jstools.isNullOrEmpty(raw_proxy_array[index])) {
             var proxy_address = "http://"+raw_proxy_array[index]+"/";
-            proxy_object[proxy_address] = { order:index };
-            settings.proxy_list.push(proxy_address);
+            if (proxy_object[proxy_address]) {
+              console.log("Multiple proxy declaration: ", proxy_address);
+            } else {
+              proxy_object[proxy_address] = {};
+              settings.proxy_list.push(proxy_address);
+            }
           }
         }
       }
@@ -54,20 +59,21 @@
   
   var interval = setInterval(function(){
     if (address_counter >= settings.address_list.length) {
-      clearInterval(interval);
       var control_interval = setInterval(function(){
         if (request_counter <= 0) {
-          clearInterval(control_interval);
           var message = JSON.stringify(proxy_object);
           console.log(message);
-          write_log(message);
-          return 1;
+          if (settings.log_to_file) write_log(message);
+          process.exit(1);
         }
-      },1000);
+      }, 1000);
     } else {
       ++request_counter;
       var proxy_address = settings.proxy_list[proxy_counter];
       proxy_object[proxy_address].begin_time = new Date();
+      proxy_object[proxy_address].address = settings.address_list[address_counter];
+      console.log(proxy_address, "\t\t=REQUEST=>\t\t".cyan, settings.address_list[address_counter]);
+
       request({
         "method": settings.request_method,
         "uri": settings.address_list[address_counter],
@@ -76,70 +82,73 @@
         "timeout": settings.request_timeout
       },
         function (err, res, body) {
-          var now = new Date(), res_address = "";
           --request_counter;
-          if (err) {
-            if (res && res.request && res.request.proxy && res.request.proxy.href) {
-              res_address = res.request.proxy.href;
+          var now = new Date(),
+              result_proxy = this.proxy.href,
+              result_address = this.href;
 
-              if (settings.log_to_mongodb) {
-                var search = new Search();
-                if (res.request.uri && res.request.uri.href) search.address = res.request.uri.href;
-                if (res.statusCode) search.status_code = res.statusCode;
-                if (res.body) search.body_length = res.body.length;
-                if (res.headers) search.headers = res.headers;
-                search.proxy = res_address;
-                search.time = proxy_object[res_address].begin_time;
-                search.duration = (now - proxy_object[res_address].begin_time) / 1000;
-                search.success = false;
-                search.error = err.stack||err;
-                search.save(function(err) {
-                  if(err) {
-                    console.log(err.stack||err);
-                    write_log(err.stack||err);
-                  }
-                });
-              }
-              proxy_object[res_address].duration = (now - proxy_object[res_address].begin_time) / 1000;
-              proxy_object[res_address].result = "ERROR";
-              proxy_object[res_address].message = err.stack||err;
-              if (res.statusCode) proxy_object[res_address].status = res.statusCode;
-            } else {
-              console.log(err.stack||err);
-              write_log(err.stack||err);
+          console.log(result_proxy, (err?"\t\t<=ERROR=\t\t".red:"\t\t<=SUCCESS=\t\t".green), result_address);
+          if (err) {
+            if (settings.log_to_mongodb) {
+              var search = new Search();
+              if (res && res.statusCode) search.status_code = res.statusCode;
+              if (res && res.body) search.body_length = res.body.length;
+              if (res && res.headers) search.headers = res.headers;
+              if (this.redirects) search.redirects = this.redirects;
+              search.return_address = result_address;
+              search.proxy = result_proxy;
+              search.address = proxy_object[result_proxy].address;
+              search.time = proxy_object[result_proxy].begin_time;
+              search.duration = (now - proxy_object[result_proxy].begin_time) / 1000;
+              search.success = false;
+              search.error = err.stack||err;
+              search.save(function(err) {
+                if(err) {
+                  console.log(err.stack||err);
+                  write_log(err.stack||err);
+                }
+              });
+            }
+
+            if (settings.log_to_file) {
+              if (res && res.statusCode) proxy_object[result_proxy].status = res.statusCode;
+              if (res && res.body) proxy_object[result_proxy].body_length = res.body.length;
+              if (res && res.headers) proxy_object[result_proxy].headers = res.headers;
+              if (this.redirects) proxy_object[result_proxy].redirects = this.redirects;
+              proxy_object[result_proxy].duration = (now - proxy_object[result_proxy].begin_time) / 1000;
+              proxy_object[result_proxy].success = false;
+              proxy_object[result_proxy].error = err.stack||err;
+              proxy_object[result_proxy].return_address = result_address;
             }
           } else {
-            if (res && res.request && res.request.proxy && res.request.proxy.href) {
-              res_address = res.request.proxy.href;
+            if (settings.log_to_mongodb) {
+              var search = new Search();
+              if (res && res.statusCode) search.status_code = res.statusCode;
+              if (res && res.body) search.body_length = res.body.length;
+              if (res && res.headers) search.headers = res.headers;
+              if (this.redirects) search.redirects = this.redirects;
+              search.return_address = result_address;
+              search.proxy = result_proxy;
+              search.address = proxy_object[result_proxy].address;
+              search.time = proxy_object[result_proxy].begin_time;
+              search.duration = (now - proxy_object[result_proxy].begin_time) / 1000;
+              search.success = true;
+              search.save(function(err) {
+                if(err) {
+                  console.log(err.stack||err);
+                  write_log(err.stack||err);
+                }
+              });
+            }
 
-              if (settings.log_to_mongodb) {
-                var search = new Search();
-                if (res.request.uri && res.request.uri.href) search.address = res.request.uri.href;
-                if (res.statusCode) search.status_code = res.statusCode;
-                if (res.body) search.body_length = res.body.length;
-                if (res.headers) search.headers = res.headers;
-                search.proxy = res_address;
-                search.time = proxy_object[res_address].begin_time;
-                search.duration = (now - proxy_object[res_address].begin_time) / 1000;
-                search.success = true;
-                search.save(function(err) {
-                  if(err) {
-                    console.log(err.stack||err);
-                    write_log(err.stack||err);
-                  }
-                });
-              }
-              proxy_object[res_address].duration = (now - proxy_object[res_address].begin_time) / 1000;
-              proxy_object[res_address].result = "SUCCESS";
-              proxy_object[res_address].message = res.headers;
-              if (res.statusCode) proxy_object[res_address].status = res.statusCode;
-            } else {
-              var message = "Response Address: "+res.request.uri.href;
-              message += "\tProxy: "+res.request.proxy.href;
-              message += "\tStatus: "+res.statusCode;
-              message += "\nHeaders: "+JSON.stringify(res.headers);
-              console.log(message);
-              write_log(message);
+            if (settings.log_to_file) {
+              if (res && res.statusCode) proxy_object[result_proxy].status = res.statusCode;
+              if (res && res.body) proxy_object[result_proxy].body_length = res.body.length;
+              if (res && res.headers) proxy_object[result_proxy].headers = res.headers;
+              if (this.redirects) proxy_object[result_proxy].redirects = this.redirects;
+              proxy_object[result_proxy].duration = (now - proxy_object[result_proxy].begin_time) / 1000;
+              proxy_object[result_proxy].success = true;
+              proxy_object[result_proxy].return_address = result_address;
             }
           }
         }

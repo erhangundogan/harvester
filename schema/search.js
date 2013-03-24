@@ -8,11 +8,13 @@ var settings   = require("../settings"),
     Connection = exports.Connection = Mongoose.createConnection(settings.mongodb_connection);
 
 var SearchSchema = new Schema({
-  "proxy": String,
-  "address": String,
+  "proxy": {type:String, index:true},
+  "address": {type:String, index:true},
+  "return_address": String,
+  "redirects": [Mixed],
   "time": Date,
-  "duration": Number,
-  "success": {type:Boolean, default:false},
+  "duration": {type:Number},
+  "success": {type:Boolean, default:false, index:true},
   "status_code": {type:Number, default:0},
   "error": String,
   "body_length": {type:Number, default:0},
