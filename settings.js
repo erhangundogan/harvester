@@ -1,16 +1,14 @@
 module.exports = {
-  "address_list": ["http://www.whatismyip.com/"], // string array of url adddresses
+  "address_list": ["http://www.cnn.com/"], // string array of url adddresses
   "proxy_list": [], // string array of proxies e.g. 0.0.0.0:8080
-  "timer": 40000, // request delay for each ome
-  "proxy_first" : true, // test all proxies first on each address
+  "timer": 10000, // request delay for each ome
   "log_to_file" : true, // test all addresses first on each proxy
   "proxy_from_file" : true, // if it is true, reads proxies list from file specified in :proxy_filename
   "address_from_file" : false, // if it is true, reads addresses list from file specified in :address_filename
   "proxy_filename" : "test", // this file should be put under proxy directory, do not specify directory name
   "address_filename" : "", // this file should be put under address directory, do not specify directory name
   "request_method" : "HEAD", // default request method, do not change this one. GET would be implemented later
-  "request_timeout" : 10000, // Integer containing the number of milliseconds to wait for a request to respond before aborting the request
-  "request_encoding" : null, // request returns buffer if sets null
+  "request_timeout" : 120000, // Integer containing the number of milliseconds to wait for a request to respond before aborting the request
   "request_headers" : {
     // specify your own properties if you want
     "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",

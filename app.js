@@ -8,7 +8,9 @@
       settings = require("./settings"),
       proxy_counter = 0,
       address_counter = 0,
-      log_filename = "";
+      log_filename = "",
+      proxy_object = {},
+      request_counter = 0;
 
   function write_log(data) {
     if (settings.log_to_file) {
@@ -25,7 +27,9 @@
         var raw_proxy_array = proxy_data.split("\r\n").trim();
         for (var index in raw_proxy_array) {
           if (!jstools.isNullOrEmpty(raw_proxy_array[index])) {
-            settings.proxy_list.push("http://"+raw_proxy_array[index]);
+            var proxy_address = "http://"+raw_proxy_array[index]+"/";
+            proxy_object[proxy_address] = { order:index };
+            settings.proxy_list.push(proxy_address);
           }
         }
       }
@@ -47,60 +51,68 @@
                    dt.getTime()+".log";
   }
   
-  var interval = setInterval(function() {
-    if (proxy_counter > settings.proxy_list.length &&
-        address_counter > settings.address_list.length) {
-      var message = "proxy/address list finished! exiting...";
-      console.log(message);
-      write_log(message);
-      return clearInterval(interval);
-    }
-
-    request({
-      "method": settings.request_method,
-      "uri": settings.address_list[address_counter],
-      "headers": settings.request_headers,
-      "proxy": settings.proxy_list[proxy_counter],
-      "timeout":settings.request_timeout
-    },
-      function (err, res, body) {
-        if (err) {
-          console.log(err.stack||err);
-          write_log(err.stack||err);
-        } else {
-          var message = "Response Address: "+res.request.uri.href;
-          message += "\tProxy: "+res.request.proxy.href;
-          message += "\tStatus: "+res.statusCode;
-          message += "\nHeaders: "+JSON.stringify(res.headers);
+  var interval = setInterval(function(){
+    if (address_counter >= settings.address_list.length) {
+      clearInterval(interval);
+      var control_interval = setInterval(function(){
+        if (request_counter <= 0) {
+          clearInterval(control_interval);
+          var message = JSON.stringify(proxy_object);
           console.log(message);
           write_log(message);
+          return 1;
         }
-      }
-    );
-
-    var log_data = "\nRequest  Address: " + settings.address_list[address_counter] +
-      "\tProxy: " + settings.proxy_list[proxy_counter];
-    console.log(log_data);
-    write_log(log_data);
-
-    if (settings.proxy_first) {
-      // finish proxies first then addresses
-      if (proxy_counter === settings.proxy_list.length-1) {
-        proxy_counter = 0;
-        address_counter++;
-      } else {
-        proxy_counter++;
-      }
+      },1000);
     } else {
-      // finish addresses first then proxies
-      if (address_counter === settings.address_list.length-1) {
-        address_counter = 0;
-        proxy_counter++;
-      } else {
-        address_counter++;
+      ++request_counter;
+      var proxy_address = settings.proxy_list[proxy_counter];
+      proxy_object[proxy_address].begin_time = new Date();
+      request({
+        "method": settings.request_method,
+        "uri": settings.address_list[address_counter],
+        "headers": settings.request_headers,
+        "proxy": proxy_address,
+        "timeout": settings.request_timeout
+      },
+        function (err, res, body) {
+          --request_counter;
+          if (err) {
+            if (res && res.request && res.request.proxy && res.request.proxy.href) {
+              var res_address = res.request.proxy.href,
+                  now = new Date();
+              proxy_object[res_address].duration = (now - proxy_object[res_address].begin_time) / 1000;
+              proxy_object[res_address].result = "ERROR";
+              proxy_object[res_address].message = err.stack||err;
+              if (res.statusCode) proxy_object[res_address].status = res.statusCode;
+            } else {
+              console.log(err.stack||err);
+              write_log(err.stack||err);
+            }
+          } else {
+            if (res && res.request && res.request.proxy && res.request.proxy.href) {
+              var res_address = res.request.proxy.href,
+                  now = new Date();
+              proxy_object[res_address].duration = (now - proxy_object[res_address].begin_time) / 1000;
+              proxy_object[res_address].result = "SUCCESS";
+              proxy_object[res_address].message = res.headers;
+              if (res.statusCode) proxy_object[res_address].status = res.statusCode;
+            } else {
+              var message = "Response Address: "+res.request.uri.href;
+              message += "\tProxy: "+res.request.proxy.href;
+              message += "\tStatus: "+res.statusCode;
+              message += "\nHeaders: "+JSON.stringify(res.headers);
+              console.log(message);
+              write_log(message);
+            }
+          }
+        }
+      );
+
+      if (++proxy_counter === settings.proxy_list.length) {
+        proxy_counter = 0;
+        ++address_counter;
       }
     }
-
   }, settings.timer);
 //})();
 
