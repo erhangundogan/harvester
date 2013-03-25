@@ -4,7 +4,7 @@ var settings   = require("../settings"),
     Schema     = exports.Schema = Mongoose.Schema,
     ObjectId   = exports.ObjectId = Schema.ObjectId,
     Mixed      = Mongoose.Schema.Types.Mixed,
-    ObjectID   = require("mongoose/node_modules/mongodb/lib/mongodb/bson/bson").ObjectID,
+    //ObjectID   = require("mongoose/node_modules/mongodb/lib/mongodb/bson/bson").ObjectID,
     Connection = exports.Connection = Mongoose.createConnection(settings.mongodb_connection);
 
 var SearchSchema = new Schema({
