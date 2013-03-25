@@ -22,4 +22,4 @@ var SearchSchema = new Schema({
   "headers": Mixed
 });
 
-var Search = exports.Search = Connection.model("search", SearchSchema);
+var Search = exports.Search = Connection.model(settings.mongodb_collection, SearchSchema);

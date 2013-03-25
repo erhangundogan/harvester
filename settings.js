@@ -5,7 +5,7 @@ module.exports = {
   "log_to_file" : false, // log results to a file
   "log_to_mongodb" : true, // log results to a mongodb database
   "mongodb_connection" : "mongodb://localhost/harvester", // mongodb database connection
-  "mongodb_collection" : "search", // mongodb collection to save
+  "mongodb_collection" : "proxy_search", // mongodb collection to save
   "proxy_from_file" : true, // if it is true, reads proxies list from file specified in :proxy_filename
   "address_from_file" : false, // if it is true, reads addresses list from file specified in :address_filename
   "proxy_filename" : "proxylist.txt", // this file should be put under proxy directory, do not specify directory name
