@@ -1,5 +1,5 @@
 module.exports = {
-  "address_list": ["http://www.cnn.com", "http://www.wired.com"], // string array of url adddresses
+  "address_list": ["http://www.twitter.com", "http://www.google.com", "http://www.microsoft.com"], // string array of url adddresses
   "proxy_list": [], // string array of proxies e.g. 0.0.0.0:8080
   "timer": 5000, // request delay for each one
   "log_to_file" : false, // log results to a file
