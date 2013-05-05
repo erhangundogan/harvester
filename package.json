@@ -1,6 +1,6 @@
 {
   "name": "proxy_harvester",
-  "version": "0.2.9",
+  "version": "0.3.0",
   "description": "Harvester, Asynchronous Proxy/Address test and automation tool",
   "keywords": ["proxy", "async", "asynchronous", "node", "nodejs"],
   "author": "Erhan Gundogan <erhan@trposta.net>",
@@ -12,6 +12,7 @@
     "request": ">= 2.16.6",
     "jstools": ">= 0.0.9",
     "colors": ">= 0.6.0-1",
-    "mongoose": ">= 3.6.0"
+    "mongoose": ">= 3.6.0",
+    "prettyjson": ">=0.8.1"
   }
 }

@@ -1,9 +1,11 @@
 var request = require("request"),
     fs = require("fs"),
     path = require("path"),
+    zlib = require("zlib"),
     jstools = require("jstools"),
     colors = require("colors"),
     settings = require("./settings"),
+    prettyjson = require("prettyjson"),
     Search = require("./schema/search").Search,
     proxy_counter = 0,
     address_counter = 0,
@@ -58,10 +60,30 @@ var interval = setInterval(function(){
   if (address_counter >= settings.address_list.length) {
     var control_interval = setInterval(function(){
       if (request_counter <= 0) {
-        var message = JSON.stringify(proxy_object);
-        console.log(message);
-        if (settings.log_to_file) write_log(message);
-        process.exit(1);
+        Search.find()
+          .where("success").equals("true")
+          .sort("duration")
+          .select("proxy duration -_id")
+          .lean()
+          .exec(function(err, docs) {
+            function exitNow() {
+              console.log("Finished exiting...");
+              process.exit(1);
+            }
+
+            if (err) {
+              console.log("[ERROR MONGODB FIND] => ", err||err.stack);
+              exitNow();
+            } else {
+              if (docs) {
+                console.log(prettyjson.render(docs));
+                if (settings.log_to_file) write_log(JSON.stringify(docs));
+                exitNow();
+              } else {
+                exitNow();
+              }
+            }
+        });
       }
     }, 1000);
   } else {
@@ -77,6 +99,7 @@ var interval = setInterval(function(){
       "uri": settings.address_list[address_counter],
       "headers": settings.request_headers,
       "proxy": proxy_address,
+      "encoding": null,
       "timeout": settings.request_timeout
     },
       function (err, res, body) {
@@ -85,80 +108,97 @@ var interval = setInterval(function(){
             result_proxy = this.proxy.href,
             result_address = this.href,
             current_proxy = proxy_object[result_proxy],
-            duration = (now-current_proxy.begin_time)/1000,
+            duration = (now-current_proxy.begin_time)/1000, // TypeError: Cannot read property 'begin_time' of undefined
             expectedResult = true;
 
-        if (!err && settings.request_method === "GET" && !jstools.isNullOrEmpty(settings.body_includes)) {
-          var regex = new RegExp(settings.body_includes);
-          expectedResult = regex.test(body);
+        function processRequest(err, expectedResult) {
+          if (err || !expectedResult) {
+            console.log(result_proxy, "\t\t<=ERROR=\t\t".red, result_address, "\t\t", duration, " secs.");
+            if (settings.log_to_mongodb) {
+              var search = new Search();
+              if (res && res.statusCode) search.status_code = res.statusCode;
+              if (res && res.body) search.body_length = res.body.length;
+              if (res && res.headers) search.headers = res.headers;
+              if (this.redirects) search.redirects = this.redirects;
+              search.return_address = result_address;
+              search.proxy = result_proxy;
+              search.address = current_proxy.address;
+              search.time = current_proxy.begin_time;
+              search.duration = duration;
+              search.success = false;
+              search.method = settings.request_method;
+              search.error = err ? err.stack||err : "Not expected content returned";
+              search.save(function(err) {
+                if(err) {
+                  console.log(err.stack||err);
+                  write_log(err.stack||err);
+                }
+              });
+            }
+
+            if (settings.log_to_file) {
+              if (res && res.statusCode) current_proxy.status = res.statusCode;
+              if (res && res.body) current_proxy.body_length = res.body.length;
+              if (res && res.headers) current_proxy.headers = res.headers;
+              if (this.redirects) current_proxy.redirects = this.redirects;
+              current_proxy.duration = duration;
+              current_proxy.success = false;
+              current_proxy.error = err ? err.stack||err : "Not expected content returned";
+              current_proxy.return_address = result_address;
+            }
+          } else {
+            console.log(result_proxy, "\t\t<=SUCCESS=\t\t".green, result_address, "\t\t", duration, " secs.");
+            if (settings.log_to_mongodb) {
+              var search = new Search();
+              if (res && res.statusCode) search.status_code = res.statusCode;
+              if (res && res.body) search.body_length = res.body.length;
+              if (res && res.headers) search.headers = res.headers;
+              if (this.redirects) search.redirects = this.redirects;
+              search.return_address = result_address;
+              search.proxy = result_proxy;
+              search.address = current_proxy.address;
+              search.time = current_proxy.begin_time;
+              search.duration = duration;
+              search.method = settings.request_method;
+              search.success = true;
+              search.save(function(err) {
+                if(err) {
+                  console.log(err.stack||err);
+                  write_log(err.stack||err);
+                }
+              });
+            }
+
+            if (settings.log_to_file) {
+              if (res && res.statusCode) current_proxy.status = res.statusCode;
+              if (res && res.body) current_proxy.body_length = res.body.length;
+              if (res && res.headers) current_proxy.headers = res.headers;
+              if (this.redirects) current_proxy.redirects = this.redirects;
+              current_proxy.duration = duration;
+              current_proxy.success = true;
+              current_proxy.return_address = result_address;
+            }
+          }
         }
 
-        if (err || !expectedResult) {
-          console.log(result_proxy, "\t\t<=ERROR=\t\t".red, result_address, "\t\t", duration, " secs.");
-          if (settings.log_to_mongodb) {
-            var search = new Search();
-            if (res && res.statusCode) search.status_code = res.statusCode;
-            if (res && res.body) search.body_length = res.body.length;
-            if (res && res.headers) search.headers = res.headers;
-            if (this.redirects) search.redirects = this.redirects;
-            search.return_address = result_address;
-            search.proxy = result_proxy;
-            search.address = current_proxy.address;
-            search.time = current_proxy.begin_time;
-            search.duration = duration;
-            search.success = false;
-            search.method = settings.request_method;
-            search.error = err ? err.stack||err : "Not expected content returned";
-            search.save(function(err) {
-              if(err) {
-                console.log(err.stack||err);
-                write_log(err.stack||err);
+        if (!err && settings.request_method === "GET" && !jstools.isNullOrEmpty(settings.body_includes)) {
+          if (res.headers["content-encoding"] == "gzip" || res.headers["content-encoding"] == "deflate") {
+            zlib.unzip(body, function(err, buffer) {
+              if (!err) {
+                var result = buffer.toString("utf-8");
+                var regex = new RegExp(settings.body_includes);
+                expectedResult = regex.test(result);
+              } else {
+                expectedResult = false;
               }
             });
+          } else {
+            var regex = new RegExp(settings.body_includes);
+            expectedResult = regex.test(body);
           }
-
-          if (settings.log_to_file) {
-            if (res && res.statusCode) current_proxy.status = res.statusCode;
-            if (res && res.body) current_proxy.body_length = res.body.length;
-            if (res && res.headers) current_proxy.headers = res.headers;
-            if (this.redirects) current_proxy.redirects = this.redirects;
-            current_proxy.duration = duration;
-            current_proxy.success = false;
-            current_proxy.error = err ? err.stack||err : "Not expected content returned";
-            current_proxy.return_address = result_address;
-          }
+          processRequest(err, expectedResult);
         } else {
-          console.log(result_proxy, "\t\t<=SUCCESS=\t\t".green, result_address, "\t\t", duration, " secs.");
-          if (settings.log_to_mongodb) {
-            var search = new Search();
-            if (res && res.statusCode) search.status_code = res.statusCode;
-            if (res && res.body) search.body_length = res.body.length;
-            if (res && res.headers) search.headers = res.headers;
-            if (this.redirects) search.redirects = this.redirects;
-            search.return_address = result_address;
-            search.proxy = result_proxy;
-            search.address = current_proxy.address;
-            search.time = current_proxy.begin_time;
-            search.duration = duration;
-            search.method = settings.request_method;
-            search.success = true;
-            search.save(function(err) {
-              if(err) {
-                console.log(err.stack||err);
-                write_log(err.stack||err);
-              }
-            });
-          }
-
-          if (settings.log_to_file) {
-            if (res && res.statusCode) current_proxy.status = res.statusCode;
-            if (res && res.body) current_proxy.body_length = res.body.length;
-            if (res && res.headers) current_proxy.headers = res.headers;
-            if (this.redirects) current_proxy.redirects = this.redirects;
-            current_proxy.duration = duration;
-            current_proxy.success = true;
-            current_proxy.return_address = result_address;
-          }
+          processRequest(err, expectedResult);
         }
       }
     );
